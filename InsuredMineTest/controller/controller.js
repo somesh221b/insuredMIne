@@ -4,9 +4,14 @@ const LOBDB=require('../model/LOB.model');
 const policyCarrierDB=require('../model/policyCarrier.model');
 const policyInfoDB=require('../model/policyInfo.model');
 const userAccountDB=require('../model/userAccount.model');
+const collection1=require('../model/colection1.model');
+const collection2=require('../model/collection2.model');
+
 const csv=require('csvtojson');
 let multer=require('multer');
 const path=require('path');
+
+const schedule = require('node-schedule');
 
 
 const uploadFile=async(req,res)=>{
@@ -20,7 +25,7 @@ const uploadFile=async(req,res)=>{
             const jsonArray=await csv().fromFile(csvFilePath);
             // console.log(jsonArray);
 
-            let agent=[],userAccount=[],pInfo=[];
+            let user=[],agent=[],userAccount=[],pInfo=[],lob=[],pCarrier=[];
             jsonArray.forEach(async(each)=>{
                 const userInfo={
                     name:each.firstname,
@@ -33,67 +38,53 @@ const uploadFile=async(req,res)=>{
                     state:each.state,
                     userType:each.userType
                 };
-                let a=new userDB(userInfo);
-                let users=await a.save();
 
+                user.push(userInfo);
                 const agentInfo={
                     agent:each.agent
                 };
                 console.log(agentInfo);
-                
-                let aa=new agentDB(agentInfo);
-                await aa.save();
+                agent.push(userInfo);
 
                 const userAccountInfo={
                     account_name:each.account_name
                 };
-                
-                let ua=new userAccountDB(userAccountInfo);
-                await ua.save();
+                userAccount.push(userAccountInfo)
                 
                 const lobinfo={
                     category_Name:each.category_name
                 }
-                
-                let b=new LOBDB(lobinfo);
-                let lobs=await b.save();
+                lob.push(lobinfo);
 
                 const pCarrierInfo={
                     company_Name:each.company_name
                 };
-                let c=new policyCarrierDB(pCarrierInfo);
-                let policyCarriers=await c.save();
-
-                // let lobs=await LOBDB.insert(lob);
-                // let policyCarriers=await policyCarrierDB.insert(pCarrier)
+                pCarrier.push(pCarrierInfo);
+                policyCarrierDB.insert(pCarrier)
                 let pinfo={
                     policyNumber:each.policy_number,
                     startDate:each.policy_start_date,
                     endDate:each.policy_end_date,
-                    policyCategoryId:lobs._id,
-                    companyCollectionId:policyCarriers._id,
-                    userId:users._id,
+                    
                 };
-                let pi=new policyInfoDB(pCarrierInfo);
-                await pi.save();
+                pInfo.push(pinfo);
+                
 
             });
-            // console.log(pInfo);
-            // let users=await userDB.insertMany(user);
-            // let agents=await agentDB.insertMany(agent)
-            // let lobs=await LOBDB.insertMany(lob)
-            // let policyCarriers=await policyCarrierDB.insertMany(pCarrier)
+            let users=await userDB.insertMany(user);
+            let agents=await agentDB.insertMany(agent)
+            let lobs=await LOBDB.insertMany(lob)
+            let policyCarriers=await policyCarrierDB.insertMany(pCarrier)
             
-            // let userAccounts=await userAccountDB.insertMany(userAccount)
-            // for(let i=0;i<pInfo.length;i++){
-            //     console.log('11111111',pInfo[i]);
-            //     // pInfo[i][policyCategoryId]=lobs[i]._id;
-            //     pInfo[i][companyCollectionId]=policyCarriers[i]._id;
-            //     pInfo[i][userId]=users[i]._id;
-            //     console.log(pInfo);
-            // }
+            let userAccounts=await userAccountDB.insertMany(userAccount)
+            for(let i=0;i<pInfo.length;i++){
+                pInfo[i]['policyCategoryId']=lobs[i]._id;
+                pInfo[i]['companyCollectionId']=policyCarriers[i]._id;
+                pInfo[i]['userId']=users[i]._id;
+                console.log(pInfo);
+            }
             
-            // let policyInfos=await policyInfoDB.insertMany(pInfo);
+            let policyInfos=await policyInfoDB.insertMany(pInfo);
             res.send('Data Insertec successfully')
         }else{
             res.send('bad')
@@ -116,5 +107,42 @@ const fileUpload = multer({
         }
         cb(undefined, true);
     }
-})
-module.exports={uploadFile,fileUpload}
+});
+const search=async(req,res)=>{
+    try{
+        console.log(req.query.name);
+        let data=await policyInfoDB.find().populate({path:'userId',select:'name'});
+        let list=[]
+        data.forEach((each)=>{
+            if(each.userId.name.toLowerCase()==req.query.name.toLowerCase()){
+                list.push(each);
+            }
+        })
+        res.send(list)
+    }catch(e){
+        console.log('error:-',e);
+    }
+}
+const scheduler=async(req,res)=>{
+    try{
+        const date=new Date(req.query.date)
+
+        let data=new collection1({
+            date,
+            message:req.query.message
+        });
+        const datum=await data.save();
+
+        const job = schedule.scheduleJob(date, async()=>{
+            let data=new collection2({
+                message:datum.message
+            });
+            await data.save();
+            await collection1.remove({_id:datum._id})
+        });
+        res.send("Data will be send on Time")
+    }catch(e){
+        console.log(e);
+    }
+}
+module.exports={uploadFile,fileUpload,search,scheduler}

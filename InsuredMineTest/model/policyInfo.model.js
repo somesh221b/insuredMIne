@@ -11,16 +11,16 @@ const policyInfoSchema=new mongoose.Schema({
         type: Date
     },
     policyCategoryId:{
-        type: String,
-        // ref: 'LOB'
+        type: mongoose.Types.ObjectId,
+        ref: 'LOB'
     },
     companyCollectionId:{
-        type: String,
-        // ref: 'policyInfo'
+        type: mongoose.Types.ObjectId,
+        ref: 'policyInfo'
     },
     userId:{
-        type: String,
-        // ref: 'user'
+        type: mongoose.Types.ObjectId,
+        ref: 'user'
     },
 });
 module.exports=mongoose.model("policyInfo",policyInfoSchema);
